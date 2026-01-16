@@ -32,6 +32,7 @@ void gamestartup();
 void gameupdate();
 void gamedraw();
 void gameshutdown();
+void togglefullscreen(int windowWidth, int windowHeight);
 void title_update();
 void title_draw();
 void draw_player(Vector2 origin);

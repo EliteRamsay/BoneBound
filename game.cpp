@@ -18,15 +18,28 @@ void gamestartup()
 
 void gameupdate()
 {
-    if (currentState == STATE_TITLE) {
+    if (currentState == STATE_TITLE) 
+    {
+        if(IsKeyPressed(KEY_F))
+        {
+            togglefullscreen(MAP_WIDTH*TILE_SIZE, MAP_HEIGHT*TILE_SIZE);
+        }
         title_update();
-    } else if (currentState == STATE_PLAYING) {
+    } 
+    else if (currentState == STATE_PLAYING) 
+    {
         if ((IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) && map[player.y][player.x + 1] != '#') player.x++;
         if ((IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A)) && map[player.y][player.x - 1] != '#') player.x--;
         if ((IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) && map[player.y - 1][player.x] != '#') player.y--;
         if ((IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) && map[player.y + 1][player.x] != '#') player.y++;
         
-        if (IsKeyPressed(KEY_ESCAPE)) {
+        if(IsKeyPressed(KEY_F))
+        {
+            togglefullscreen(MAP_WIDTH*TILE_SIZE, MAP_HEIGHT*TILE_SIZE);
+        }
+
+        if (IsKeyPressed(KEY_BACKSPACE)) 
+        {
             currentState = STATE_TITLE;
         }
     }
@@ -53,6 +66,22 @@ void gameshutdown()
     CloseAudioDevice();
 }
 
+void togglefullscreen(int windowWidth, int windowHeight)
+{
+    if(!IsWindowFullscreen())
+    {
+        int monitor = GetCurrentMonitor();
+        SetWindowSize(GetMonitorWidth(monitor), GetMonitorHeight(monitor));
+        ToggleFullscreen();
+    }
+    else
+    {
+        ToggleFullscreen();
+        SetWindowSize(windowWidth, windowHeight);
+    }
+}
+
+//Main Menu
 void title_update()
 {
     if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {

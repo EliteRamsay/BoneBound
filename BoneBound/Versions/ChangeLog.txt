@@ -1,0 +1,25 @@
+01/19/2026
+-Update To Version 0.0.3
+    -Added Camera System With Smooth Following
+    -Added Zoom Controls With Mouse Wheel
+    -Added Random Map Generation Based On Size
+    -Added 6 Map Sizes: Tiny, Small, Medium, Large, Huge, Gigantic
+    -Added Dynamic Map Allocation For Different Sizes
+    -Added Camera Reset With R Key
+    -Added HUD With Position, Map Info, And Controls
+    -Fixed Camera Centering For Small Maps
+    -Fixed Fullscreen Compatibility With Camera System
+------------------------------------------------------------------------
+01/16/2026
+-Update To Version 0.0.2
+    -Added Application Icon
+    -Added Fullscreen Toggle With F
+    -Added Back To Main Menu With Backspace
+------------------------------------------------------------------------
+01/15/2026
+-Version 0.0.1 Made
+    -Basic Game Structure
+    -Title Screen With Menu
+    -Player Movement
+    -Static Map Display
+    -Basic Collision Detection

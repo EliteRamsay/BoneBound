@@ -2,13 +2,17 @@
 
 int main()
 {
-    InitWindow(
-        MAP_WIDTH*TILE_SIZE,
-        MAP_HEIGHT*TILE_SIZE,
-         "BoneBound");
+    // Start with default screen size
+    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "BoneBound");
+    
     SetTargetFPS(60);
     srand(time(NULL));
+    
     gamestartup();
+    
+    // Don't generate initial map - let user choose from menu
+    // The camera will be initialized when they select a map size
+    
     while(!WindowShouldClose())
     {
         // Update Game
@@ -18,9 +22,7 @@ int main()
     }
 
     gameshutdown();
-
     CloseWindow();
-
 
     return 0;
 }

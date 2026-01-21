@@ -1,18 +1,22 @@
 #include "project.h"
 
 // Global game variables
+WorldTile** worldMap = NULL;
 Player player;
+Player localPlayer;
 GameState currentState = STATE_TITLE;
 GameCamera gameCamera;
+bool isInLocalMap = false;
+int saveSlotSelected = 0;
+bool shouldQuit = false;  // Quit flag
 
 // Menu variables
 int selectedOption = 0;
 bool hasSave = false;
 
 // Map data
-char** map = NULL;
-int currentMapWidth = MAP_WIDTH;
-int currentMapHeight = MAP_HEIGHT;
+int currentMapWidth = DEFAULT_WORLD_WIDTH;
+int currentMapHeight = DEFAULT_WORLD_HEIGHT;
 
 // Map sizes with default zoom levels
 MapConfig mapSizes[NUM_SIZES] = {
@@ -23,6 +27,19 @@ MapConfig mapSizes[NUM_SIZES] = {
     {128, 128, "HUGE", 0.4f},
     {256, 256, "GIGANTIC", 0.2f}
 };
+
+// Check if save file exists
+bool save_file_exists(int slot)
+{
+    char filename[50];
+    sprintf(filename, "save_%d.dat", slot);
+    FILE* test = fopen(filename, "rb");
+    if (test) {
+        fclose(test);
+        return true;
+    }
+    return false;
+}
 
 // Clamp a value between min and max
 float clamp_float(float value, float min, float max)
@@ -53,6 +70,7 @@ void init_camera()
     gameCamera.camera.rotation = 0.0f;
     
     // Set zoom based on map size
+    gameCamera.zoom = 1.0f; // Default
     for (int i = 0; i < NUM_SIZES; i++) {
         if (currentMapWidth == mapSizes[i].width && currentMapHeight == mapSizes[i].height) {
             gameCamera.zoom = mapSizes[i].defaultZoom;
@@ -90,18 +108,33 @@ void update_camera()
     };
     
     // Target is player position
-    Vector2 targetPos = { 
-        (float)(player.x * TILE_SIZE + TILE_SIZE / 2.0f), 
-        (float)(player.y * TILE_SIZE + TILE_SIZE / 2.0f) 
-    };
+    Vector2 targetPos;
+    if (isInLocalMap) {
+        targetPos = { 
+            (float)(localPlayer.x * TILE_SIZE + TILE_SIZE / 2.0f), 
+            (float)(localPlayer.y * TILE_SIZE + TILE_SIZE / 2.0f) 
+        };
+    } else {
+        targetPos = { 
+            (float)(player.x * TILE_SIZE + TILE_SIZE / 2.0f), 
+            (float)(player.y * TILE_SIZE + TILE_SIZE / 2.0f) 
+        };
+    }
     
     // Smooth camera movement
     float lerpSpeed = 0.15f;
     gameCamera.camera.target.x += (targetPos.x - gameCamera.camera.target.x) * lerpSpeed;
     gameCamera.camera.target.y += (targetPos.y - gameCamera.camera.target.y) * lerpSpeed;
     
-    float mapWidthWorld = currentMapWidth * TILE_SIZE;
-    float mapHeightWorld = currentMapHeight * TILE_SIZE;
+    float mapWidthWorld, mapHeightWorld;
+    if (isInLocalMap && worldMap[player.y][player.x].localMap != NULL) {
+        LocalMap* local = worldMap[player.y][player.x].localMap;
+        mapWidthWorld = local->width * TILE_SIZE;
+        mapHeightWorld = local->height * TILE_SIZE;
+    } else {
+        mapWidthWorld = currentMapWidth * TILE_SIZE;
+        mapHeightWorld = currentMapHeight * TILE_SIZE;
+    }
     
     // Handle zoom with mouse wheel
     float wheelMove = GetMouseWheelMove();
@@ -112,7 +145,10 @@ void update_camera()
         // Set zoom limits based on map size
         float minZoom, maxZoom;
         
-        if (currentMapWidth <= 8 && currentMapHeight <= 8) {
+        if (isInLocalMap) {
+            minZoom = 0.1f;
+            maxZoom = 2.0f;
+        } else if (currentMapWidth <= 8 && currentMapHeight <= 8) {
             minZoom = 1.0f;
             maxZoom = 8.0f;
         } else if (currentMapWidth <= 16 && currentMapHeight <= 16) {
@@ -163,128 +199,17 @@ void update_camera()
     }
 }
 
-// Convert world to screen coordinates
-Vector2 get_world_to_screen(Vector2 worldPos)
-{
-    return GetWorldToScreen2D(worldPos, gameCamera.camera);
-}
-
 // Initialize game
 void gamestartup()
 {
     InitAudioDevice();
     player = {2, 2};
+    localPlayer = {2, 2};
     currentState = STATE_TITLE;
     selectedOption = 0;
     hasSave = false;
-}
-
-// Update game logic
-void gameupdate()
-{
-    if (currentState == STATE_TITLE) 
-    {
-        if(IsKeyPressed(KEY_F))
-        {
-            togglefullscreen(SCREEN_WIDTH, SCREEN_HEIGHT);
-        }
-        title_update();
-    } 
-    else if (currentState == STATE_MAPSIZE) 
-    {
-        mapsize_update();
-    }
-    else if (currentState == STATE_PLAYING) 
-    {
-        // Store old position
-        int oldX = player.x;
-        int oldY = player.y;
-        
-        // Player movement with collision
-        if ((IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) && 
-            player.x + 1 < currentMapWidth && 
-            map[player.y][player.x + 1] != '#') player.x++;
-        
-        if ((IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A)) && 
-            player.x > 0 && 
-            map[player.y][player.x - 1] != '#') player.x--;
-        
-        if ((IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) && 
-            player.y > 0 && 
-            map[player.y - 1][player.x] != '#') player.y--;
-        
-        if ((IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) && 
-            player.y + 1 < currentMapHeight && 
-            map[player.y + 1][player.x] != '#') player.y++;
-        
-        // Update camera if player moved
-        if (oldX != player.x || oldY != player.y)
-        {
-            update_camera();
-        }
-        
-        // Always update camera
-        update_camera();
-        
-        // Toggle fullscreen
-        if(IsKeyPressed(KEY_F))
-        {
-            int currentWidth = GetScreenWidth();
-            int currentHeight = GetScreenHeight();
-            togglefullscreen(currentWidth, currentHeight);
-            update_camera();
-        }
-        
-        // Reset camera
-        if (IsKeyPressed(KEY_R))
-        {
-            reset_camera_to_default();
-        }
-
-        // Return to menu
-        if (IsKeyPressed(KEY_BACKSPACE)) 
-        {
-            currentState = STATE_TITLE;
-        }
-    }
-}
-
-// Draw game
-void gamedraw()
-{
-    BeginDrawing();
-    ClearBackground(BLACK);
-    
-    if (currentState == STATE_TITLE) 
-    {
-        title_draw();
-    }
-    else if (currentState == STATE_MAPSIZE) 
-    {
-        mapsize_draw();
-    } 
-    else if (currentState == STATE_PLAYING) 
-    {
-        BeginMode2D(gameCamera.camera);
-        
-        // Draw map and player
-        draw_map();
-        draw_player();
-        
-        EndMode2D();
-        
-        // Draw HUD
-        draw_hud();
-    }
-    
-    EndDrawing();
-}
-
-// Clean up game
-void gameshutdown()
-{
-    cleanup_map();
-    CloseAudioDevice();
+    isInLocalMap = false;
+    shouldQuit = false;
 }
 
 // Toggle fullscreen mode
@@ -319,57 +244,53 @@ void togglefullscreen(int windowWidth, int windowHeight)
     }
 }
 
-// Free map memory
-void cleanup_map()
+// Create world map
+void generate_world_map(int width, int height)
 {
-    if (map != NULL)
-    {
-        for (int i = 0; i < currentMapHeight; i++)
-        {
-            free(map[i]);
-        }
-        free(map);
-        map = NULL;
-    }
-}
-
-// Create random map
-void generate_random_map(int width, int height)
-{
-    cleanup_map();
+    cleanup_all_maps();
     
     currentMapWidth = width;
     currentMapHeight = height;
     
-    // Allocate map memory
-    map = (char**)malloc(height * sizeof(char*));
+    // Allocate world map memory
+    worldMap = (WorldTile**)malloc(height * sizeof(WorldTile*));
     for (int y = 0; y < height; y++)
     {
-        map[y] = (char*)malloc((width + 1) * sizeof(char));
+        worldMap[y] = (WorldTile*)malloc(width * sizeof(WorldTile));
         
         for (int x = 0; x < width; x++)
         {
             // Border walls
             if (x == 0 || x == width - 1 || y == 0 || y == height - 1)
             {
-                map[y][x] = '#';
+                worldMap[y][x].worldTile = '#';
+                worldMap[y][x].hasLocalMap = false;
             }
             else
             {
                 // Random terrain
                 float randVal = (float)rand() / RAND_MAX;
                 
-                if (randVal < 0.05)
-                    map[y][x] = '~';
-                else if (randVal < 0.15)
-                    map[y][x] = '^';
-                else if (randVal < 0.20)
-                    map[y][x] = 'T';
-                else
-                    map[y][x] = '.';
+                if (randVal < 0.05) {
+                    worldMap[y][x].worldTile = '~';
+                    worldMap[y][x].hasLocalMap = true;  // Water can have local maps
+                }
+                else if (randVal < 0.15) {
+                    worldMap[y][x].worldTile = '^';
+                    worldMap[y][x].hasLocalMap = true;  // Mountains can have local maps
+                }
+                else if (randVal < 0.20) {
+                    worldMap[y][x].worldTile = 'T';
+                    worldMap[y][x].hasLocalMap = true;  // Forests can have local maps
+                }
+                else {
+                    worldMap[y][x].worldTile = '.';
+                    worldMap[y][x].hasLocalMap = true;  // Grasslands can have local maps
+                }
             }
+            
+            worldMap[y][x].localMap = NULL; // Not generated yet
         }
-        map[y][width] = '\0';
     }
     
     // Clear starting area
@@ -377,17 +298,484 @@ void generate_random_map(int width, int height)
     {
         for (int x = 1; x <= 3; x++)
         {
-            if (y < height && x < width)
-                map[y][x] = '.';
+            if (y < height && x < width) {
+                worldMap[y][x].worldTile = '.';
+                worldMap[y][x].hasLocalMap = true;
+            }
         }
     }
     
     // Set player start
     player.x = 2;
     player.y = 2;
+    localPlayer.x = 2;
+    localPlayer.y = 2;
     
     // Setup camera
     init_camera();
+}
+
+// Generate local map at specific world coordinates
+void generate_local_map_at(int worldX, int worldY)
+{
+    if (!worldMap[worldY][worldX].hasLocalMap) return;
+    
+    // Allocate local map
+    LocalMap* local = (LocalMap*)malloc(sizeof(LocalMap));
+    local->width = LOCAL_MAP_WIDTH;   // 256 as requested
+    local->height = LOCAL_MAP_HEIGHT; // 256 as requested
+    
+    // Allocate tiles
+    local->tiles = (char**)malloc(local->height * sizeof(char*));
+    for (int y = 0; y < local->height; y++)
+    {
+        local->tiles[y] = (char*)malloc((local->width + 1) * sizeof(char));
+        
+        for (int x = 0; x < local->width; x++)
+        {
+            // Border walls
+            if (x == 0 || x == local->width - 1 || y == 0 || y == local->height - 1)
+            {
+                local->tiles[y][x] = '#';
+            }
+            else
+            {
+                // Generate based on world tile type with variety
+                switch (worldMap[worldY][worldX].worldTile)
+                {
+                    case '.':  // Grassland
+                        {
+                            float randVal = (float)rand() / RAND_MAX;
+                            if (randVal < 0.02) local->tiles[y][x] = '~';      // Some water
+                            else if (randVal < 0.04) local->tiles[y][x] = '^'; // Some mountains
+                            else if (randVal < 0.10) local->tiles[y][x] = 'T'; // Some trees
+                            else local->tiles[y][x] = '.';
+                        }
+                        break;
+                    case 'T':  // Forest
+                        {
+                            float randVal = (float)rand() / RAND_MAX;
+                            if (randVal < 0.01) local->tiles[y][x] = '~';      // Some water
+                            else if (randVal < 0.02) local->tiles[y][x] = '^'; // Some mountains
+                            else if (randVal < 0.70) local->tiles[y][x] = 'T'; // Mostly trees
+                            else local->tiles[y][x] = '.';
+                        }
+                        break;
+                    case '~':  // Water
+                        {
+                            float randVal = (float)rand() / RAND_MAX;
+                            if (randVal < 0.90) local->tiles[y][x] = '~';      // Mostly water
+                            else if (randVal < 0.95) local->tiles[y][x] = '.'; // Some land
+                            else local->tiles[y][x] = '^';                     // Some mountains in water
+                        }
+                        break;
+                    case '^':  // Mountains
+                        {
+                            float randVal = (float)rand() / RAND_MAX;
+                            if (randVal < 0.85) local->tiles[y][x] = '^';      // Mostly mountains
+                            else if (randVal < 0.90) local->tiles[y][x] = '~'; // Some water
+                            else local->tiles[y][x] = '.';                     // Some clear areas
+                        }
+                        break;
+                    default:
+                        local->tiles[y][x] = '.';
+                }
+            }
+        }
+        local->tiles[y][local->width] = '\0';
+    }
+    
+    // Clear starting area in local map
+    for (int y = 1; y <= 3; y++)
+    {
+        for (int x = 1; x <= 3; x++)
+        {
+            if (y < local->height && x < local->width)
+                local->tiles[y][x] = '.';
+        }
+    }
+    
+    // Set to world map
+    worldMap[worldY][worldX].localMap = local;
+}
+
+// Enter local map
+void enter_local_map(int worldX, int worldY)
+{
+    if (!worldMap[worldY][worldX].hasLocalMap) return;
+    
+    // Generate if not exists
+    if (worldMap[worldY][worldX].localMap == NULL)
+    {
+        generate_local_map_at(worldX, worldY);
+    }
+    
+    // Switch to local map state
+    isInLocalMap = true;
+    localPlayer.x = LOCAL_MAP_WIDTH / 2;
+    localPlayer.y = LOCAL_MAP_HEIGHT / 2;
+    
+    // Adjust camera for local map
+    reset_camera_to_default();
+}
+
+// Exit local map
+void exit_local_map()
+{
+    isInLocalMap = false;
+    reset_camera_to_default();
+}
+
+// Free all map memory
+void cleanup_all_maps()
+{
+    if (worldMap != NULL)
+    {
+        for (int y = 0; y < currentMapHeight; y++)
+        {
+            for (int x = 0; x < currentMapWidth; x++)
+            {
+                if (worldMap[y][x].localMap != NULL)
+                {
+                    LocalMap* local = worldMap[y][x].localMap;
+                    for (int ly = 0; ly < local->height; ly++)
+                    {
+                        free(local->tiles[ly]);
+                    }
+                    free(local->tiles);
+                    free(local);
+                }
+            }
+            free(worldMap[y]);
+        }
+        free(worldMap);
+        worldMap = NULL;
+    }
+}
+
+// Save game to slot
+void save_game_to_slot(int slot)
+{
+    char filename[50];
+    sprintf(filename, "save_%d.dat", slot);
+    
+    FILE* file = fopen(filename, "wb");
+    if (!file) return;
+    
+    // Save world dimensions
+    fwrite(&currentMapWidth, sizeof(int), 1, file);
+    fwrite(&currentMapHeight, sizeof(int), 1, file);
+    
+    // Save player position
+    fwrite(&player.x, sizeof(int), 1, file);
+    fwrite(&player.y, sizeof(int), 1, file);
+    fwrite(&localPlayer.x, sizeof(int), 1, file);
+    fwrite(&localPlayer.y, sizeof(int), 1, file);
+    fwrite(&isInLocalMap, sizeof(bool), 1, file);
+    
+    // Save world map
+    for (int y = 0; y < currentMapHeight; y++)
+    {
+        for (int x = 0; x < currentMapWidth; x++)
+        {
+            // Save world tile data
+            fwrite(&worldMap[y][x].worldTile, sizeof(char), 1, file);
+            fwrite(&worldMap[y][x].hasLocalMap, sizeof(bool), 1, file);
+            
+            // Save local map if exists
+            bool hasLocal = (worldMap[y][x].localMap != NULL);
+            fwrite(&hasLocal, sizeof(bool), 1, file);
+            
+            if (hasLocal)
+            {
+                LocalMap* local = worldMap[y][x].localMap;
+                fwrite(&local->width, sizeof(int), 1, file);
+                fwrite(&local->height, sizeof(int), 1, file);
+                
+                for (int ly = 0; ly < local->height; ly++)
+                {
+                    fwrite(local->tiles[ly], sizeof(char), local->width, file);
+                }
+            }
+        }
+    }
+    
+    fclose(file);
+}
+
+// Load game from slot
+bool load_game_from_slot(int slot)
+{
+    char filename[50];
+    sprintf(filename, "save_%d.dat", slot);
+    
+    FILE* file = fopen(filename, "rb");
+    if (!file) return false;
+    
+    // Clean up existing maps
+    cleanup_all_maps();
+    
+    // Load world dimensions
+    fread(&currentMapWidth, sizeof(int), 1, file);
+    fread(&currentMapHeight, sizeof(int), 1, file);
+    
+    // Load player position
+    fread(&player.x, sizeof(int), 1, file);
+    fread(&player.y, sizeof(int), 1, file);
+    fread(&localPlayer.x, sizeof(int), 1, file);
+    fread(&localPlayer.y, sizeof(int), 1, file);
+    fread(&isInLocalMap, sizeof(bool), 1, file);
+    
+    // Allocate world map
+    worldMap = (WorldTile**)malloc(currentMapHeight * sizeof(WorldTile*));
+    for (int y = 0; y < currentMapHeight; y++)
+    {
+        worldMap[y] = (WorldTile*)malloc(currentMapWidth * sizeof(WorldTile));
+        
+        for (int x = 0; x < currentMapWidth; x++)
+        {
+            // Load world tile data
+            fread(&worldMap[y][x].worldTile, sizeof(char), 1, file);
+            fread(&worldMap[y][x].hasLocalMap, sizeof(bool), 1, file);
+            
+            // Load local map if exists
+            bool hasLocal;
+            fread(&hasLocal, sizeof(bool), 1, file);
+            
+            if (hasLocal)
+            {
+                LocalMap* local = (LocalMap*)malloc(sizeof(LocalMap));
+                fread(&local->width, sizeof(int), 1, file);
+                fread(&local->height, sizeof(int), 1, file);
+                
+                local->tiles = (char**)malloc(local->height * sizeof(char*));
+                for (int ly = 0; ly < local->height; ly++)
+                {
+                    local->tiles[ly] = (char*)malloc((local->width + 1) * sizeof(char));
+                    fread(local->tiles[ly], sizeof(char), local->width, file);
+                    local->tiles[ly][local->width] = '\0';
+                }
+                
+                worldMap[y][x].localMap = local;
+            }
+            else
+            {
+                worldMap[y][x].localMap = NULL;
+            }
+        }
+    }
+    
+    fclose(file);
+    
+    // Setup camera
+    init_camera();
+    currentState = STATE_PLAYING;
+    
+    return true;
+}
+
+// Update game logic
+void gameupdate()
+{
+    if (shouldQuit) {
+        CloseWindow(); // This will break the main loop
+        return;
+    }
+    
+    if (currentState == STATE_TITLE) 
+    {
+        if(IsKeyPressed(KEY_F))
+        {
+            togglefullscreen(SCREEN_WIDTH, SCREEN_HEIGHT);
+        }
+        title_update();
+    } 
+    else if (currentState == STATE_MAPSIZE) 
+    {
+        if(IsKeyPressed(KEY_F))
+        {
+            togglefullscreen(SCREEN_WIDTH, SCREEN_HEIGHT);
+        }
+        mapsize_update();
+    }
+    else if (currentState == STATE_SAVE_MENU)
+    {
+        save_menu_update();
+    }
+    else if (currentState == STATE_LOAD_MENU)
+    {
+        load_menu_update();
+    }
+    else if (currentState == STATE_PLAYING) 
+    {
+        if (isInLocalMap)
+        {
+            // Inside local map
+            LocalMap* currentLocal = worldMap[player.y][player.x].localMap;
+            
+            // Store old position
+            int oldX = localPlayer.x;
+            int oldY = localPlayer.y;
+            
+            // Player movement within local map
+            if ((IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) && 
+                localPlayer.x + 1 < currentLocal->width && 
+                currentLocal->tiles[localPlayer.y][localPlayer.x + 1] != '#') localPlayer.x++;
+            
+            if ((IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A)) && 
+                localPlayer.x > 0 && 
+                currentLocal->tiles[localPlayer.y][localPlayer.x - 1] != '#') localPlayer.x--;
+            
+            if ((IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) && 
+                localPlayer.y > 0 && 
+                currentLocal->tiles[localPlayer.y - 1][localPlayer.x] != '#') localPlayer.y--;
+            
+            if ((IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) && 
+                localPlayer.y + 1 < currentLocal->height && 
+                currentLocal->tiles[localPlayer.y + 1][localPlayer.x] != '#') localPlayer.y++;
+            
+            // Exit local map with BACKSPACE only (not at edges)
+            if (IsKeyPressed(KEY_BACKSPACE))
+            {
+                exit_local_map();
+            }
+            
+            // Update camera if player moved
+            if (oldX != localPlayer.x || oldY != localPlayer.y)
+            {
+                update_camera();
+            }
+        }
+        else
+        {
+            // On world map
+            int oldX = player.x;
+            int oldY = player.y;
+            
+            // Player movement on world map
+            if ((IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) && 
+                player.x + 1 < currentMapWidth && 
+                worldMap[player.y][player.x + 1].worldTile != '#') player.x++;
+            
+            if ((IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A)) && 
+                player.x > 0 && 
+                worldMap[player.y][player.x - 1].worldTile != '#') player.x--;
+            
+            if ((IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) && 
+                player.y > 0 && 
+                worldMap[player.y - 1][player.x].worldTile != '#') player.y--;
+            
+            if ((IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) && 
+                player.y + 1 < currentMapHeight && 
+                worldMap[player.y + 1][player.x].worldTile != '#') player.y++;
+            
+            // Enter local map
+            if (IsKeyPressed(KEY_ENTER) && worldMap[player.y][player.x].hasLocalMap)
+            {
+                enter_local_map(player.x, player.y);
+            }
+            
+            // Update camera if player moved
+            if (oldX != player.x || oldY != player.y)
+            {
+                update_camera();
+            }
+            
+            // Return to menu with BACKSPACE
+            if (IsKeyPressed(KEY_BACKSPACE))
+            {
+                currentState = STATE_TITLE;
+                selectedOption = 0;
+            }
+        }
+        
+        // Always update camera
+        update_camera();
+        
+        // Toggle fullscreen
+        if(IsKeyPressed(KEY_F))
+        {
+            int currentWidth = GetScreenWidth();
+            int currentHeight = GetScreenHeight();
+            togglefullscreen(currentWidth, currentHeight);
+            update_camera();
+        }
+        
+        // Reset camera
+        if (IsKeyPressed(KEY_R))
+        {
+            reset_camera_to_default();
+        }
+
+        // Save menu
+        if (IsKeyPressed(KEY_F5))
+        {
+            currentState = STATE_SAVE_MENU;
+            saveSlotSelected = 0;
+        }
+        
+        // Load menu
+        if (IsKeyPressed(KEY_F9))
+        {
+            currentState = STATE_LOAD_MENU;
+            saveSlotSelected = 0;
+        }
+    }
+}
+
+// Draw game
+void gamedraw()
+{
+    BeginDrawing();
+    ClearBackground(BLACK);
+    
+    if (currentState == STATE_TITLE) 
+    {
+        title_draw();
+    }
+    else if (currentState == STATE_MAPSIZE) 
+    {
+        mapsize_draw();
+    } 
+    else if (currentState == STATE_SAVE_MENU)
+    {
+        save_menu_draw();
+    }
+    else if (currentState == STATE_LOAD_MENU)
+    {
+        load_menu_draw();
+    }
+    else if (currentState == STATE_PLAYING) 
+    {
+        BeginMode2D(gameCamera.camera);
+        
+        if (isInLocalMap)
+        {
+            // Draw local map and player
+            draw_local_map();
+            draw_local_player();
+        }
+        else
+        {
+            // Draw world map and player
+            draw_world_map();
+            draw_player();
+        }
+        
+        EndMode2D();
+        
+        // Draw HUD
+        draw_hud();
+    }
+    
+    EndDrawing();
+}
+
+// Clean up game
+void gameshutdown()
+{
+    cleanup_all_maps();
+    CloseAudioDevice();
 }
 
 // Update title screen
@@ -395,11 +783,11 @@ void title_update()
 {
     // Menu navigation
     if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
-        selectedOption = (selectedOption + 1) % 2;
+        selectedOption = (selectedOption + 1) % 3;
     }
     
     if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) {
-        selectedOption = (selectedOption - 1 + 2) % 2;
+        selectedOption = (selectedOption - 1 + 3) % 3;
     }
     
     // Menu selection
@@ -407,9 +795,15 @@ void title_update()
         if (selectedOption == 0) {
             selectedOption = 0;
             currentState = STATE_MAPSIZE;
-        } else if (selectedOption == 1 && hasSave) {
-            currentState = STATE_PLAYING;
-            init_camera();
+        } else if (selectedOption == 1) {
+            // Only go to load menu if a save exists
+            if (save_file_exists(0) || save_file_exists(1) || save_file_exists(2)) {
+                currentState = STATE_LOAD_MENU;
+                saveSlotSelected = 0;
+            }
+        } else if (selectedOption == 2) {
+            // Quit game
+            shouldQuit = true;
         }
     }
 }
@@ -430,11 +824,15 @@ void title_draw()
     DrawTextEx(GetFontDefault(), gameTitle, titlePos, 48, 2, YELLOW);
     
     // Draw menu options
-    const char* options[] = {"NEW GAME", "RESUME"};
+    const char* options[] = {"NEW GAME", "LOAD GAME", "QUIT"};
     
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 3; i++) {
         Color color = (i == selectedOption) ? YELLOW : WHITE;
-        if (i == 1 && !hasSave) color = GRAY;
+        
+        // Gray out LOAD GAME if no saves exist
+        if (i == 1 && !(save_file_exists(0) || save_file_exists(1) || save_file_exists(2))) {
+            color = GRAY;
+        }
         
         const char* optionText = options[i];
         Vector2 textSize = MeasureTextEx(GetFontDefault(), optionText, 32, 1);
@@ -444,7 +842,7 @@ void title_draw()
         };
         
         // Selection arrows
-        if (i == selectedOption) {
+        if (i == selectedOption && !(i == 1 && color.r == GRAY.r && color.g == GRAY.g && color.b == GRAY.b)) {
             DrawText(">", (int)textPos.x - 21, (int)textPos.y, 32, YELLOW);
             DrawText("<", (int)(textPos.x + textSize.x + 10), (int)textPos.y, 32, YELLOW);
         }
@@ -476,7 +874,7 @@ void mapsize_update()
     
     // Selection
     if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
-        generate_random_map(mapSizes[selectedOption].width, mapSizes[selectedOption].height);
+        generate_world_map(mapSizes[selectedOption].width, mapSizes[selectedOption].height);
         currentState = STATE_PLAYING;
     }
     
@@ -555,7 +953,179 @@ void mapsize_draw()
     }
 }
 
-// Draw player
+// Save menu update
+void save_menu_update()
+{
+    // Navigation
+    if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
+        saveSlotSelected = (saveSlotSelected + 1) % 3;
+    }
+    
+    if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) {
+        saveSlotSelected = (saveSlotSelected - 1 + 3) % 3;
+    }
+    
+    // Selection
+    if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
+        save_game_to_slot(saveSlotSelected);
+        currentState = STATE_PLAYING;
+    }
+    
+    // Back to game
+    if (IsKeyPressed(KEY_BACKSPACE) || IsKeyPressed(KEY_ESCAPE)) {
+        currentState = STATE_PLAYING;
+    }
+}
+
+// Save menu draw
+void save_menu_draw()
+{
+    const char* Title = "Save Game";
+    int screenWidth = GetScreenWidth();
+    int screenHeight = GetScreenHeight();
+    
+    // Title
+    Vector2 titleSize = MeasureTextEx(GetFontDefault(), Title, 48, 2);
+    Vector2 titlePos = {
+        (float)screenWidth / 2.0f - titleSize.x / 2.0f,
+        (float)screenHeight / 6.0f
+    };
+    DrawTextEx(GetFontDefault(), Title, titlePos, 48, 2, YELLOW);
+    
+    // Save slots
+    const char* slotNames[] = {"Save Slot 1", "Save Slot 2", "Save Slot 3"};
+    
+    for (int i = 0; i < 3; i++) {
+        Color color = (i == saveSlotSelected) ? YELLOW : WHITE;
+        
+        Vector2 textSize = MeasureTextEx(GetFontDefault(), slotNames[i], 32, 1);
+        Vector2 textPos = {
+            (float)screenWidth / 2.0f - textSize.x / 2.0f,
+            (float)screenHeight / 2.0f + i * 50.0f
+        };
+        
+        // Selection arrows
+        if (i == saveSlotSelected) {
+            DrawText(">", (int)textPos.x - 21, (int)textPos.y, 32, YELLOW);
+            DrawText("<", (int)(textPos.x + textSize.x + 10), (int)textPos.y, 32, YELLOW);
+        }
+        
+        DrawTextEx(GetFontDefault(), slotNames[i], textPos, 32, 1, color);
+    }
+    
+    // Instructions
+    const char* instructions[] = {
+        "Use UP/DOWN to select save slot",
+        "ENTER to save",
+        "BACKSPACE to return to game"
+    };
+    
+    for (int i = 0; i < 3; i++) {
+        Vector2 instSize = MeasureTextEx(GetFontDefault(), instructions[i], 20, 1);
+        Vector2 instPos = {
+            (float)screenWidth / 2.0f - instSize.x / 2.0f,
+            (float)screenHeight - 100.0f + i * 25.0f
+        };
+        DrawTextEx(GetFontDefault(), instructions[i], instPos, 20, 1, LIGHTGRAY);
+    }
+}
+
+// Load menu update
+void load_menu_update()
+{
+    // Navigation
+    if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
+        saveSlotSelected = (saveSlotSelected + 1) % 3;
+    }
+    
+    if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) {
+        saveSlotSelected = (saveSlotSelected - 1 + 3) % 3;
+    }
+    
+    // Selection - only if save exists
+    if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
+        if (save_file_exists(saveSlotSelected)) {
+            if (load_game_from_slot(saveSlotSelected)) {
+                currentState = STATE_PLAYING;
+            }
+        }
+    }
+    
+    // Back to game
+    if (IsKeyPressed(KEY_BACKSPACE) || IsKeyPressed(KEY_ESCAPE)) {
+        currentState = STATE_PLAYING;
+    }
+}
+
+// Load menu draw
+void load_menu_draw()
+{
+    const char* Title = "Load Game";
+    int screenWidth = GetScreenWidth();
+    int screenHeight = GetScreenHeight();
+    
+    // Title
+    Vector2 titleSize = MeasureTextEx(GetFontDefault(), Title, 48, 2);
+    Vector2 titlePos = {
+        (float)screenWidth / 2.0f - titleSize.x / 2.0f,
+        (float)screenHeight / 6.0f
+    };
+    DrawTextEx(GetFontDefault(), Title, titlePos, 48, 2, YELLOW);
+    
+    // Load slots
+    const char* slotNames[] = {"Load Slot 1", "Load Slot 2", "Load Slot 3"};
+    
+    for (int i = 0; i < 3; i++) {
+        Color color = (i == saveSlotSelected) ? YELLOW : WHITE;
+        
+        // Check if save file exists
+        bool exists = save_file_exists(i);
+        
+        if (!exists) color = GRAY;
+        
+        Vector2 textSize = MeasureTextEx(GetFontDefault(), slotNames[i], 32, 1);
+        Vector2 textPos = {
+            (float)screenWidth / 2.0f - textSize.x / 2.0f,
+            (float)screenHeight / 2.0f + i * 50.0f
+        };
+        
+        // Selection arrows - only if save exists
+        if (i == saveSlotSelected && exists) {
+            DrawText(">", (int)textPos.x - 21, (int)textPos.y, 32, YELLOW);
+            DrawText("<", (int)(textPos.x + textSize.x + 10), (int)textPos.y, 32, YELLOW);
+        }
+        
+        DrawTextEx(GetFontDefault(), slotNames[i], textPos, 32, 1, color);
+        
+        // Show if empty
+        if (!exists) {
+            Vector2 emptySize = MeasureTextEx(GetFontDefault(), "(Empty)", 20, 1);
+            Vector2 emptyPos = {
+                (float)screenWidth / 2.0f - emptySize.x / 2.0f,
+                textPos.y + 35.0f
+            };
+            DrawTextEx(GetFontDefault(), "(Empty)", emptyPos, 20, 1, GRAY);
+        }
+    }
+    
+    // Instructions
+    const char* instructions[] = {
+        "Use UP/DOWN to select save slot",
+        "ENTER to load (if save exists)",
+        "BACKSPACE to return to game"
+    };
+    
+    for (int i = 0; i < 3; i++) {
+        Vector2 instSize = MeasureTextEx(GetFontDefault(), instructions[i], 20, 1);
+        Vector2 instPos = {
+            (float)screenWidth / 2.0f - instSize.x / 2.0f,
+            (float)screenHeight - 100.0f + i * 25.0f
+        };
+        DrawTextEx(GetFontDefault(), instructions[i], instPos, 20, 1, LIGHTGRAY);
+    }
+}
+
+// Draw player (on world map)
 void draw_player()
 {
     Vector2 pos = 
@@ -573,31 +1143,43 @@ void draw_player()
         YELLOW);
 }
 
+// Draw local player (inside local map)
+void draw_local_player()
+{
+    Vector2 pos = 
+    {
+        (float)(localPlayer.x * TILE_SIZE + 8), 
+        (float)(localPlayer.y * TILE_SIZE + 6)
+    };
+    
+    DrawTextEx(
+        GetFontDefault(),
+        "D",
+        pos,
+        24,
+        1,
+        YELLOW);
+}
+
 // Draw HUD
 void draw_hud()
 {
     int screenWidth = GetScreenWidth();
     int screenHeight = GetScreenHeight();
     
-    // Player position
-    char posText[50];
-    sprintf(posText, "Position: (%d, %d)", player.x, player.y);
-    DrawText(posText, 10, 10, 20, WHITE);
+    if (isInLocalMap)
+    {
+        DrawText("Local Map - BACKSPACE: Exit to World | F5: Save | F9: Load", 10, screenHeight - 30, 18, LIGHTGRAY);
+        DrawText(TextFormat("Local Position: %d,%d | Map: %dx%d", localPlayer.x, localPlayer.y, LOCAL_MAP_WIDTH, LOCAL_MAP_HEIGHT), 
+                10, screenHeight - 55, 18, LIGHTGRAY);
+    }
+    else
+    {
+        DrawText("World Map - ENTER: Enter Local Area | F5: Save | F9: Load", 10, screenHeight - 30, 18, LIGHTGRAY);
+        DrawText(TextFormat("World Position: %d,%d | Tile Type: %c", player.x, player.y, worldMap[player.y][player.x].worldTile), 
+                10, screenHeight - 55, 18, LIGHTGRAY);
+    }
     
-    // Map info
-    char mapText[100];
-    sprintf(mapText, "Map: %s (%dx%d) Zoom: %.1fx", 
-        mapSizes[selectedOption].name, 
-        currentMapWidth, currentMapHeight, gameCamera.zoom);
-    DrawText(mapText, 10, 35, 20, WHITE);
-    
-    // Camera position
-    char camText[100];
-    sprintf(camText, "Camera: (%.0f, %.0f)", 
-        gameCamera.camera.target.x, gameCamera.camera.target.y);
-    DrawText(camText, 10, 60, 20, LIGHTGRAY);
-    
-    // Instructions
-    DrawText("WASD/Arrows: Move | R: Reset Camera | Mouse Wheel: Zoom", 10, screenHeight - 30, 18, LIGHTGRAY);
-    DrawText("BACKSPACE: Menu | F: Toggle Fullscreen", 10, screenHeight - 55, 18, LIGHTGRAY);
+    DrawText("WASD/Arrows: Move | R: Reset Camera | Mouse Wheel: Zoom", 10, screenHeight - 80, 18, LIGHTGRAY);
+    DrawText("BACKSPACE: Menu/Exit | F: Toggle Fullscreen", 10, screenHeight - 105, 18, LIGHTGRAY);
 }

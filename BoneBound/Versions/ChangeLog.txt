@@ -1,3 +1,15 @@
+01/21/2026
+-Update To Version 0.0.4
+    -Added Nested Map System (World Map + Local Maps)
+    -Added Enter/Exit Local Maps With ENTER/BACKSPACE
+    -Added 256x256 Local Maps For Each World Tile
+    -Added Save/Load System With 3 Save Slots
+    -Added Save Menu (F5) And Load Menu (F9)
+    -Added Persistent Map Data (World + All Local Maps)
+    -Added Tile Variety In Local Maps Based On World Tile Type
+    -Added Proper Menu Navigation With Save File Detection
+    -Added Quit Functionality From Main Menu
+    -Fixed Camera System For Large Local Maps
 01/19/2026
 -Update To Version 0.0.3
     -Added Camera System With Smooth Following

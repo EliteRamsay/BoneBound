@@ -1,3 +1,37 @@
+02/27/2026
+-Update To Version 0.0.6
+    -Increased NPC spawn rates in villages
+    -Made building generation more random
+    -Varied furniture placement in houses
+    -Randomized door locations on buildings
+    -Added town center with fountain
+    -Fixed Backspace from Load Game Menu to Main Menu Crashing Game
+    -Added Version Number To Bottom Left Corner Of Main Menu And Load Menu
+02/24/2026
+-Update To Version 0.0.5
+    -Added NPC System With Villagers, Guards, Merchants, And Bandits
+    -Added Towns With Procedurally Generated Buildings
+    -Added Enhanced Crash Reporter With Detailed Diagnostics
+    -Added Proper Memory Initialization For All Spawn Points
+    -Added E Key To Interact With NPCs
+    -Added NPC Cleanup When Exiting Local Maps
+    -Added Area Clearance Checks Before Placing Buildings
+    -Added Memory Usage Warnings At 600MB And 800MB
+    -Added NULL Pointer Checks Throughout Codebase
+    -Added Bounds Validation For All Array Access
+    -Added Proper Cleanup Of NPCs And Maps On Exit
+    -Reduced Village Spawn Points From 8-15 To 5-10 For Better Performance
+    -Reduced NPCs Per Spawn Point From 2-4 To 1-2
+    -Made Houses Smaller (5x4 Instead Of 8x6)
+    -Fixed Critical Crash When Entering Villages (Spawn Points Not Initialized)
+    -Fixed Local Map Movement (Was Completely Broken)
+    -Fixed BACKSPACE Behavior (Exits Local Map, Returns To Menu From World Map)
+    -Fixed Camera Zoom Reset Issues When Changing Maps
+    -Fixed NPC Duplication Bug When Re-entering Maps
+    -Fixed Location Type Enum Order (LOCATION_NONE Is Now 0)
+    -Fixed Multiple Definition Errors In Global Variables
+    -Resolved Windows/raylib Header Conflicts
+------------------------------------------------------------------------
 01/21/2026
 -Update To Version 0.0.4
     -Added Nested Map System (World Map + Local Maps)
@@ -10,6 +44,7 @@
     -Added Proper Menu Navigation With Save File Detection
     -Added Quit Functionality From Main Menu
     -Fixed Camera System For Large Local Maps
+------------------------------------------------------------------------
 01/19/2026
 -Update To Version 0.0.3
     -Added Camera System With Smooth Following

@@ -1,0 +1,42 @@
+========================================
+     BONEBOUND CRASH REPORT
+========================================
+Time: Fri Feb 27 22:45:55 2026
+Error Type: Signal Crash
+
+========================================
+         GAME STATE
+========================================
+Current State: 3 (STATE_PLAYING)
+In Local Map: No
+World Position: (2,2)
+Local Position: (128,128)
+Total NPCs: 0
+Map Size: 20x15
+worldMap pointer: 0000000000000000
+
+========================================
+         DIAGNOSTIC CHECKS
+========================================
+❌ worldMap is NULL - map not initialized!
+
+  ℹ Not in local map - local position (128,128) should not be accessed
+
+  NPC STATUS:
+  ℹ No NPCs loaded
+
+========================================
+         DETAILED EXPLANATION
+========================================
+SEGMENTATION FAULT - The game tried to access memory it doesn't have permission to access.
+
+COMMON CAUSES:
+• Dereferencing a NULL pointer (trying to use memory address 0)
+• Using a pointer after the memory has been freed
+• Accessing an array index outside its bounds
+• Stack overflow from too many nested function calls
+
+CHECK YOUR CODE FOR:
+• worldMap[y][x] access without bounds checking (y=2, x=2)
+• NPC array access with index >= npcCount (0)
+• Player position validation

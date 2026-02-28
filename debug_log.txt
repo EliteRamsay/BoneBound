@@ -1,0 +1,5 @@
+=== BONEBOUND DEBUG LOG ===
+Started: Fri Feb 27 22:49:52 2026
+Program started
+Window initialized
+Player initialized at (2,2)

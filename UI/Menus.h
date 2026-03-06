@@ -11,5 +11,7 @@ void SaveMenuUpdate();
 void SaveMenuDraw();
 void LoadMenuUpdate();
 void LoadMenuDraw();
+void CharacerCreationUpdate();
+void CharacterCreationDraw();
 
 #endif

@@ -146,6 +146,69 @@ void MapSizeDraw()
     }
 }
 
+void CharacterCreationDraw()
+{
+    int screenWidth = GetScreenWidth();
+    int screenHeight = GetScreenHeight();
+    
+    // Version in bottom left - fixed narrowing conversion
+    const char* version = "v0.0.6";
+    DrawTextEx(GetFontDefault(), version, (Vector2){ 10.0f, (float)(screenHeight - 25) }, 16, 1, DARKGRAY);
+    
+    // Title
+    const char* title = "Character Creation";
+    Vector2 titleSize = MeasureTextEx(GetFontDefault(), title, 48, 2);
+    Vector2 titlePos = {
+        screenWidth / 2.0f - titleSize.x / 2.0f,
+        screenHeight / 6.0f
+    };
+    DrawTextEx(GetFontDefault(), title, titlePos, 48, 2, YELLOW);
+    
+    // Placeholder text
+    const char* placeholder = "Select your race!";
+    Vector2 phSize = MeasureTextEx(GetFontDefault(), placeholder, 28, 1);
+    Vector2 phPos = {
+        screenWidth / 2.0f - phSize.x / 2.0f,
+        screenHeight / 2.0f
+    };
+    DrawTextEx(GetFontDefault(), placeholder, phPos, 28, 1, LIGHTGRAY);
+
+    //Pick between dog and cat, with cat being default.
+    const char* options[] = {"Dog", "Cat"};
+    for (int i = 0; i < 2; i++) {
+        Color color = (i == 1) ? YELLOW : WHITE;
+        
+        Vector2 textSize = MeasureTextEx(GetFontDefault(), options[i], 28, 1);
+        Vector2 textPos = {
+            screenWidth / 2.0f - textSize.x / 2.0f,
+            screenHeight / 2.0f + 50.0f + i * 40.0f
+        };
+        
+        if (i == 1) {
+            DrawText(">", textPos.x - 21, textPos.y, 28, YELLOW);
+            DrawText("<", textPos.x + textSize.x + 10, textPos.y, 28, YELLOW);
+        }
+        
+        DrawTextEx(GetFontDefault(), options[i], textPos, 28, 1, color);
+    }
+}
+
+void CharacterCreationUpdate()
+{
+    // Placeholder for character creation logic. For now, just toggle between dog and cat with up/down and confirm with enter.
+    if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S))
+        selectedOption = (selectedOption + 1) % 2;
+    if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W))
+        selectedOption = (selectedOption - 1 + 2) % 2;
+    if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
+        // Set players isCat based on selection, then move player to playing state
+        player.isCat = (selectedOption == 1);
+        currentState = STATE_PLAYING;
+    }
+}
+
+
+
 void SaveMenuUpdate()
 {
     if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S))

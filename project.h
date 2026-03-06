@@ -36,7 +36,7 @@ typedef enum {
 
 typedef enum {
     STATE_TITLE, STATE_MAPSIZE, STATE_SEED,
-    STATE_PLAYING, STATE_SAVE_MENU, STATE_LOAD_MENU
+    STATE_PLAYING, STATE_SAVE_MENU, STATE_LOAD_MENU,STATE_CHARACTER_CREATION
 } GameState;
 
 typedef enum {
@@ -221,6 +221,10 @@ typedef struct {
     Position worldPos;
     Position localPos;
     bool isInLocalMap;
+    bool isCat;
+    int health;
+    int maxHealth;
+    int gold;
 } PlayerData;
 
 // ===== GLOBAL VARIABLES =====
